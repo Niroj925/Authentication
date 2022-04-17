@@ -18,6 +18,12 @@ const md5 = require('md5');
 //to hasing and salting
 const bcrypt=require('bcrypt');
 const saltRound=10;//it genrerate 10 salt character 
+
+const session=require('express-session');
+const passport = require('passport');
+const passportLocalMongoose=require('passport-local-mongoose');
+
+
 app.set('view engine', 'ejs');
 app.set('views',viewpath);
 
@@ -25,12 +31,25 @@ app.use(bodyParser.urlencoded({ extended: true}));
 
 app.use(express.static('public'));
 
-mongoose.connect("mongodb://localhost:27017/userDB");
+app.use(session({
+    secret:'mero secret file yehi ho hai gaich',
+    resave:false,
+    saveUninitialized:false
+}));
 
+app.use(passport.initialize());
+app.use(passport.session());
+
+
+mongoose.connect("mongodb://localhost:27017/userDB");
+//mongoose Schema
 const userSchema =new mongoose.Schema({
     email:String,
     password:String
 });
+
+userSchema.plugin(passportLocalMongoose);
+
 //to encrypt the password
 //const secretkey='mero secrete key'; //must not use here
 //we directly does not use secrete here because it is 
@@ -44,6 +63,10 @@ const secretkey =process.env.Secretkey;
 //userSchema.plugin(encrypt,{secret:secretkey,encryptedFields:['password']});
 
 const userlist=new mongoose.model('user',userSchema);
+
+passport.serializeUser(userlist.serializeUser());
+passport.deserializeUser(userlist.deserializeUser());
+
 //let's hashing some text
 //console.log(md5('niroj'));
 //console.log(md5('niroj'));
@@ -61,44 +84,49 @@ app.get('/submit', function(req, res){
     res.render('submit');
 });
 
-app.post('/register', function(req, res){
+app.get('/secret',function(req, res){
+    if(req.isAuthenticated()){
+        res.render('secret');
+    }else{
+        res.redirect('/login');
+    }
+})
 
-    //for hashing and salting 
-    bcrypt.hash(req.body.password, saltRound, function(err, hash){
-        const newuser=new userlist({
-        email: req.body.username,
-        password: hash//hashing and salting
-    }) 
-     newuser.save(function(err){
+app.get('/logout',function(req, res){
+    req.logout();
+    res.redirect('/');
+})
+app.post('/register', function(req, res){
+    
+    userlist.register({username: req.body.username}, req.body.password,function(err, user){
         if(err){
             console.log(err);
+            res.redirect('/register');
         }else{
-            res.render('secret');
+            passport.authenticate('local')(req,res,function(){
+                res.redirect('/secret');
+            })
         }
-    });
+    })
+   
     })
    
    app.post('/login', function(req, res){
-       const username=req.body.username;
-       const password=req.body.password;
-       console.log(password);  
-       userlist.findOne({email:username},function(err,founduser){
-           if(err){
-               console.log(err);
-           }else{
-               console.log(founduser);
-               if(founduser){
-                   bcrypt.compare(password,founduser.password,function(err,result){
-                       console.log(result);
-                       if(result ===true){
-                           res.render('secret');
-                       }
-                   })
-               }
-           }
-       })
-   })
+     
+    const user=new userlist({
+        username: req.body.username,
+        password: req.body.password
+    });
 
+    req.login(user,function(err){
+        if(err){
+            console.log(err);
+        }else{
+            passport.authenticate('local')(req,res,function(){
+                res.redirect('/secret');
+            })
+        }
+    });
 })
 
 const port=process.env.PORT||3300;
