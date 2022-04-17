@@ -63,7 +63,7 @@ app.get('/submit', function(req, res){
 
 app.post('/register', function(req, res){
 
-    //for hsshing and salting 
+    //for hashing and salting 
     bcrypt.hash(req.body.password, saltRound, function(err, hash){
         const newuser=new userlist({
         email: req.body.username,
@@ -81,12 +81,15 @@ app.post('/register', function(req, res){
    app.post('/login', function(req, res){
        const username=req.body.username;
        const password=req.body.password;
-       userlist.findOne({email: username},function(err,founduser){
+       console.log(password);  
+       userlist.findOne({email:username},function(err,founduser){
            if(err){
                console.log(err);
            }else{
+               console.log(founduser);
                if(founduser){
                    bcrypt.compare(password,founduser.password,function(err,result){
+                       console.log(result);
                        if(result ===true){
                            res.render('secret');
                        }
